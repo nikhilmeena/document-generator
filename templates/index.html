@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Maker</title>
+  <style>
+    :root {
+      --card: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --border: #e8e8e8;
+      --drop-bg: #f3f4f6;
+      --btn: #1a1a1a;
+      --btn-hover: #333333;
+      --error-bg: #fef2f2;
+      --error-text: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: url("{{ url_for('static', filename='images/background.png') }}") center / cover no-repeat fixed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 32px 28px 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .alert {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid #fecaca;
+      font-size: 0.92rem;
+    }
+
+    .drop-zone {
+      position: relative;
+      border-radius: 16px;
+      background: var(--drop-bg);
+      padding: 28px 20px 22px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      margin-bottom: 14px;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      background: #eceef2;
+      box-shadow: inset 0 0 0 2px #d1d5db;
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-icon {
+      width: 42px;
+      height: 42px;
+      margin: 0 auto 14px;
+      color: #111;
+    }
+
+    .drop-title {
+      font-size: 0.98rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .drop-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .file-name {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #374151;
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    .section-label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin: 18px 0 10px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .pill-input {
+      width: 100%;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.95rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .pill-input:focus {
+      border-color: #9ca3af;
+    }
+
+    .pill-input.full {
+      grid-column: 1 / -1;
+    }
+
+    .doc-list {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .doc-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .doc-item input {
+      width: 16px;
+      height: 16px;
+      accent-color: #111;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 18px;
+      padding: 16px 20px;
+      border: none;
+      border-radius: 999px;
+      background: var(--btn);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button[type="submit"]:hover {
+      background: var(--btn-hover);
+    }
+
+    .footnote {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 540px) {
+      .field-grid { grid-template-columns: 1fr; }
+      .card { padding: 24px 18px 20px; border-radius: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Upload your files</h1>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form action="{{ url_for('review') }}" method="post" enctype="multipart/form-data" id="upload-form">
+        <div class="drop-zone" id="brs-drop">
+          <input type="file" id="brs_file" name="brs_file" accept=".docx" required>
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
+            <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="drop-title">BRS document — drop here or click to browse</div>
+          <div class="drop-hint">DOCX only</div>
+          <div class="file-name" id="brs-file-name"></div>
+        </div>
+
+        <div class="drop-zone" id="testcase-drop">
+          <input type="file" id="testcase_file" name="testcase_file" accept=".xlsx,.xlsm">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
+            <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="drop-title">Test case workbook — drop here or click to browse</div>
+          <div class="drop-hint">XLSX — required for System Test Cases</div>
+          <div class="file-name" id="testcase-file-name"></div>
+        </div>
+
+        <label class="section-label">Project details</label>
+        <div class="field-grid">
+          <input class="pill-input" type="text" id="cr_number" name="cr_number" placeholder="CR number" required>
+          <input class="pill-input" type="text" id="deployment_date" name="deployment_date" placeholder="DD-MM-YYYY" required>
+          <input class="pill-input full" type="text" id="files_components" name="files_components" placeholder="Files / components being moved" required>
+          <input class="pill-input" type="text" id="spoc_name" name="spoc_name" placeholder="SPOC name" value="Nikhil">
+        </div>
+
+        <label class="section-label">Documents to generate</label>
+        <div class="doc-list">
+          {% for key, meta in document_types.items() %}
+            <label class="doc-item">
+              <input type="checkbox" name="documents" value="{{ key }}" checked>
+              {{ meta.label }}
+            </label>
+          {% endfor %}
+        </div>
+
+        <label class="section-label" for="comments">Any thoughts?</label>
+        <input class="pill-input" type="text" id="comments" name="comments" placeholder="Add comments here">
+
+        <button type="submit">Review extracted data</button>
+      </form>
+
+      <p class="footnote">
+        Generates Approach, Impact, System Test Cases, UAT Deployment Note, and Release Deployment from your BRS and test case files.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function bindDropZone(zoneId, inputId, labelId) {
+      const zone = document.getElementById(zoneId);
+      const input = document.getElementById(inputId);
+      const label = document.getElementById(labelId);
+
+      input.addEventListener("change", () => {
+        label.textContent = input.files[0] ? input.files[0].name : "";
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          zone.classList.add("dragover");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          zone.classList.remove("dragover");
+        });
+      });
+
+      zone.addEventListener("drop", (event) => {
+        const files = event.dataTransfer.files;
+        if (files.length) {
+          input.files = files;
+          label.textContent = files[0].name;
+        }
+      });
+    }
+
+    bindDropZone("brs-drop", "brs_file", "brs-file-name");
+    bindDropZone("testcase-drop", "testcase_file", "testcase-file-name");
+  </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review BRS Data — Document Maker</title>
+  <style>
+    :root {
+      --card: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --border: #e8e8e8;
+      --drop-bg: #f3f4f6;
+      --btn: #1a1a1a;
+      --btn-hover: #333333;
+      --error-bg: #fef2f2;
+      --error-text: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: url("{{ url_for('static', filename='images/background.png') }}") center / cover no-repeat fixed;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 720px;
+      margin: 20px 0 40px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 32px 28px 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .meta-box {
+      background: var(--drop-bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .meta-box strong {
+      display: inline-block;
+      min-width: 130px;
+    }
+
+    .section-label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin: 18px 0 8px;
+    }
+
+    .section-hint {
+      display: block;
+      margin: -4px 0 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #9ca3af;
+    }
+
+    .pill-input {
+      width: 100%;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.95rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .pill-input:focus {
+      border-color: #9ca3af;
+    }
+
+    .notice {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    textarea.readonly {
+      background: var(--drop-bg);
+      color: #374151;
+      min-height: 220px;
+    }
+
+    textarea.empty-section {
+      min-height: 120px;
+      border-style: dashed;
+    }
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .doc-chip {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 0.82rem;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 20px;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--btn);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--btn-hover);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    @media (max-width: 640px) {
+      .actions { grid-template-columns: 1fr; }
+      .card { padding: 24px 18px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Review extracted BRS data</h1>
+      <p class="subtitle">
+        {% if is_structured %}
+        Edit the document name and BRS sections below before generating.
+        {% else %}
+        This BRS is not in the standard format. Use the extracted content below as reference and fill in sections 1.1, 1.3, and 2.1 manually.
+        {% endif %}
+      </p>
+
+      {% if not is_structured %}
+      <div class="notice">
+        Standard sections 1.1, 1.3, and 2.1 were not found. Extracted BRS content is shown below for reference — copy the relevant parts into each section field.
+      </div>
+      {% endif %}
+
+      <div class="meta-box">
+        <div><strong>CR number</strong> {{ cr_number }}</div>
+        <div><strong>Deployment date</strong> {{ deployment_date }}</div>
+        <div><strong>SPOC</strong> {{ spoc_name }}</div>
+      </div>
+
+      <div class="section-label">Documents to generate</div>
+      <div class="doc-summary">
+        {% for key in selected_documents %}
+          <span class="doc-chip">{{ document_types[key].label }}</span>
+        {% endfor %}
+      </div>
+
+      <form action="{{ url_for('generate') }}" method="post">
+        <input type="hidden" name="brs_filename" value="{{ brs_filename }}">
+        <input type="hidden" name="testcase_filename" value="{{ testcase_filename }}">
+        <input type="hidden" name="cr_number" value="{{ cr_number }}">
+        <input type="hidden" name="deployment_date" value="{{ deployment_date }}">
+        <input type="hidden" name="files_components" value="{{ files_components }}">
+        <input type="hidden" name="spoc_name" value="{{ spoc_name }}">
+        <input type="hidden" name="comments" value="{{ comments }}">
+        {% for key in selected_documents %}
+          <input type="hidden" name="documents" value="{{ key }}">
+        {% endfor %}
+
+        <label class="section-label" for="document_name">Document name</label>
+        <span class="section-hint">From BRS header — used in Release CR description, UAT deployment title, and System Test Cases module.</span>
+        <input class="pill-input" type="text" id="document_name" name="document_name" value="{{ document_name }}" required>
+
+        {% if not is_structured %}
+        <label class="section-label" for="raw_content">Extracted BRS content (reference)</label>
+        <span class="section-hint">Read-only — use this to populate the section fields below.</span>
+        <textarea id="raw_content" class="readonly" readonly>{{ raw_content }}</textarea>
+        {% endif %}
+
+        <label class="section-label" for="section_1_1">BRS 1.1 — Objective / Epic</label>
+        <span class="section-hint">Used in Approach Introduction, Impact summary, and Release purpose block 1.</span>
+        <textarea id="section_1_1" name="section_1_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 1.1 Objective / Epic content here{% endif %}">{{ sections["1.1"] }}</textarea>
+
+        <label class="section-label" for="section_1_3">BRS 1.3 — Need and Benefits</label>
+        <span class="section-hint">Used in Approach Requirement 1, UAT deployment note, and Release purpose block 2.</span>
+        <textarea id="section_1_3" name="section_1_3" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 1.3 Need and Benefits content here{% endif %}">{{ sections["1.3"] }}</textarea>
+
+        <label class="section-label" for="section_2_1">BRS 2.1 — User Story</label>
+        <span class="section-hint">Used in Approach Requirement 1, UAT deployment note, and Release purpose block 3.</span>
+        <textarea id="section_2_1" name="section_2_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 2.1 User Story content here{% endif %}">{{ sections["2.1"] }}</textarea>
+
+        <div class="actions">
+          <a class="btn btn-secondary" href="{{ url_for('index') }}">Back</a>
+          <button class="btn btn-primary" type="submit">Generate documents</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
