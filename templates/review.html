@@ -202,13 +202,13 @@
         {% if is_structured %}
         Edit the document name and BRS sections below before generating.
         {% else %}
-        This BRS is not in the standard format. Use the extracted content below as reference and fill in sections 1.1, 1.3, and 2.1 manually.
+        This BRS is not in the standard format. Sections 1, 2, and 3 are pre-filled from the BRS where possible — review and edit before generating.
         {% endif %}
       </p>
 
       {% if not is_structured %}
       <div class="notice">
-        Standard sections 1.1, 1.3, and 2.1 were not found. Extracted BRS content is shown below for reference — copy the relevant parts into each section field.
+        Standard sections were not found. Sections 1, 2, and 3 are pre-filled from Name of the project and business requirement fields where available.
       </div>
       {% endif %}
 
@@ -247,17 +247,17 @@
         <textarea id="raw_content" class="readonly" readonly>{{ raw_content }}</textarea>
         {% endif %}
 
-        <label class="section-label" for="section_1_1">BRS 1.1 — Objective / Epic</label>
+        <label class="section-label" for="section_1_1">1 — Objective / Epic</label>
         <span class="section-hint">Used in Approach Introduction, Impact summary, and Release purpose block 1.</span>
-        <textarea id="section_1_1" name="section_1_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 1.1 Objective / Epic content here{% endif %}">{{ sections["1.1"] }}</textarea>
+        <textarea id="section_1_1" name="section_1_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type section 1 content here{% endif %}">{{ sections["1.1"] }}</textarea>
 
-        <label class="section-label" for="section_1_3">BRS 1.3 — Need and Benefits</label>
+        <label class="section-label" for="section_1_3">2 — Need and Benefits</label>
         <span class="section-hint">Used in Approach Requirement 1, UAT deployment note, and Release purpose block 2.</span>
-        <textarea id="section_1_3" name="section_1_3" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 1.3 Need and Benefits content here{% endif %}">{{ sections["1.3"] }}</textarea>
+        <textarea id="section_1_3" name="section_1_3" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type section 2 content here{% endif %}">{{ sections["1.3"] }}</textarea>
 
-        <label class="section-label" for="section_2_1">BRS 2.1 — User Story</label>
+        <label class="section-label" for="section_2_1">3 — User Story</label>
         <span class="section-hint">Used in Approach Requirement 1, UAT deployment note, and Release purpose block 3.</span>
-        <textarea id="section_2_1" name="section_2_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type 2.1 User Story content here{% endif %}">{{ sections["2.1"] }}</textarea>
+        <textarea id="section_2_1" name="section_2_1" class="{% if not is_structured %}empty-section{% endif %}" required placeholder="{% if not is_structured %}Paste or type section 3 content here{% endif %}">{{ sections["2.1"] }}</textarea>
 
         <div class="actions">
           <a class="btn btn-secondary" href="{{ url_for('index') }}">Back</a>

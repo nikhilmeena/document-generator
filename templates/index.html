@@ -413,7 +413,7 @@
       if (enabled) {
         uploadForm.action = "{{ url_for('batch_review') }}";
         submitBtn.textContent = "Review batch folders";
-        footnote.textContent = "Scans each selected folder for BRS and test case files, then generates zip files inside those folders.";
+        footnote.textContent = "Scans each selected folder for BRS and test case files, then generates a single zip file in the parent folder.";
       } else {
         uploadForm.action = "{{ url_for('review') }}";
         submitBtn.textContent = "Review extracted data";

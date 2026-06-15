@@ -175,6 +175,160 @@ def _find_section_bounds(
     return start, end
 
 
+def _extract_tables(docx_path: str | Path) -> list[list[list[str]]]:
+    with zipfile.ZipFile(docx_path) as archive:
+        document_xml = archive.read("word/document.xml")
+
+    root = ET.fromstring(document_xml)
+    tables: list[list[list[str]]] = []
+
+    for table in root.iter(f"{W_NS}tbl"):
+        rows: list[list[str]] = []
+        for row in table.iter(f"{W_NS}tr"):
+            cells: list[str] = []
+            for cell in row.iter(f"{W_NS}tc"):
+                cell_text = "".join(
+                    text_node.text or ""
+                    for text_node in cell.iter(f"{W_NS}t")
+                ).strip()
+                cells.append(cell_text)
+            if any(cells):
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+
+    return tables
+
+
+def _looks_like_section_header(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if SECTION_PATTERN.match(stripped):
+        return True
+    if re.match(r"^[A-Z][A-Z0-9\s/&-]{3,}$", stripped):
+        return True
+    return False
+
+
+def _extract_labeled_field(
+    paragraphs: list[ParagraphInfo],
+    label_pattern: str,
+    *,
+    start: int = 0,
+    end: int | None = None,
+    label_keywords: tuple[str, ...] | None = None,
+) -> str:
+    if end is None:
+        end = len(paragraphs)
+
+    compiled = re.compile(label_pattern, re.IGNORECASE)
+    for index in range(start, end):
+        stripped = paragraphs[index].text.strip()
+        if not stripped:
+            continue
+
+        matched = False
+        inline = ""
+
+        match = compiled.match(stripped)
+        if match:
+            matched = True
+            if match.lastindex:
+                inline = (match.group(1) or "").strip()
+            elif ":" in stripped:
+                inline = stripped.split(":", 1)[1].strip()
+        elif label_keywords and any(keyword in stripped.lower() for keyword in label_keywords):
+            matched = True
+            if ":" in stripped:
+                inline = stripped.split(":", 1)[1].strip()
+            elif "—" in stripped:
+                inline = stripped.split("—", 1)[1].strip()
+            elif " - " in stripped:
+                inline = stripped.split(" - ", 1)[1].strip()
+
+        if not matched:
+            continue
+
+        if inline and not _is_placeholder(inline):
+            return inline
+
+        for next_index in range(index + 1, min(index + 5, end)):
+            next_text = paragraphs[next_index].text.strip()
+            if not next_text or _is_placeholder(next_text):
+                continue
+            if _looks_like_section_header(next_text):
+                break
+            return _strip_doc_bullet_prefix(next_text)
+
+    return ""
+
+
+def _extract_table_fields(docx_path: str | Path) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    project_keywords = ("name of the project", "name of project", "project name")
+    business_keywords = ("business requirement", "business requirements")
+
+    for table in _extract_tables(docx_path):
+        for row in table:
+            if len(row) < 2:
+                continue
+            label = row[0].strip().lower()
+            value = " ".join(cell.strip() for cell in row[1:] if cell.strip()).strip()
+            if not value or _is_placeholder(value):
+                continue
+            if any(keyword in label for keyword in project_keywords):
+                fields.setdefault("project_name", value)
+            elif any(keyword in label for keyword in business_keywords):
+                fields.setdefault("business_requirement", value)
+    return fields
+
+
+def _format_review_section(number: str, content: str) -> str:
+    return f"{number}\n\n{content}".strip()
+
+
+def extract_unstructured_sections(docx_path: str | Path) -> dict[str, str]:
+    """Populate review sections from unstructured BRS label fields."""
+    paragraphs = _extract_paragraphs(docx_path)
+    table_fields = _extract_table_fields(docx_path)
+
+    project_name = table_fields.get("project_name") or _extract_labeled_field(
+        paragraphs,
+        r"^name\s+of\s+(?:the\s+)?project\s*:?\s*(.*)$",
+        label_keywords=("name of the project", "name of project", "project name"),
+    )
+    if not project_name:
+        project_name = extract_document_name(docx_path) or ""
+
+    section_2_1_content = project_name
+    detailed_bounds = _find_section_bounds(
+        paragraphs,
+        r"^DETAILED\s+INFORMATION",
+        r"^(?:[A-Z][A-Z0-9\s/&-]{4,}|\d+\.?\s)",
+    )
+    if detailed_bounds:
+        start, end = detailed_bounds
+        business_requirement = table_fields.get("business_requirement") or _extract_labeled_field(
+            paragraphs,
+            r"^business\s+requirement[s]?\s*:?\s*(.*)$",
+            start=start,
+            end=end,
+            label_keywords=("business requirement", "business requirements"),
+        )
+        if business_requirement:
+            section_2_1_content = business_requirement
+
+    if not project_name:
+        return {"1.1": "", "1.3": "", "2.1": ""}
+
+    return {
+        "1.1": _format_review_section("1", project_name),
+        "1.3": _format_review_section("2", project_name),
+        "2.1": _format_review_section("3", section_2_1_content or project_name),
+    }
+
+
 def _paragraphs_to_text(paragraphs: list[ParagraphInfo]) -> str:
     lines: list[str] = []
     for paragraph in paragraphs:
@@ -285,7 +439,7 @@ def extract_for_review(docx_path: str | Path) -> ReviewExtraction:
         document_name=document_name,
         is_structured=False,
         raw_content=extract_raw_brs_content(docx_path),
-        sections={"1.1": "", "1.3": "", "2.1": ""},
+        sections=extract_unstructured_sections(docx_path),
     )
 
 
@@ -335,10 +489,11 @@ def format_section_edit(section: PurposeSection, brs_number: str) -> str:
 
 def format_sections_for_review(sections: list[PurposeSection]) -> dict[str, str]:
     """Return editable text blocks keyed by BRS section number."""
-    brs_numbers = ("1.1", "1.3", "2.1")
+    section_keys = ("1.1", "1.3", "2.1")
+    display_numbers = ("1", "2", "3")
     result: dict[str, str] = {}
-    for brs_number, section in zip(brs_numbers, sections):
-        result[brs_number] = format_section_edit(section, brs_number)
+    for section_key, display_number, section in zip(section_keys, display_numbers, sections):
+        result[section_key] = format_section_edit(section, display_number)
     return result
 
 

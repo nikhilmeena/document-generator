@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from brs_parser import extract_for_review
-from generators import build_context, create_zip_bundle, generate_documents
+from generators import build_context, create_combined_zip_bundle, generate_documents
 from generators.system_test_cases import TESTCASE_FILENAME_PREFIX, extract_testcase_preview
 
 SKIP_DOCX = {
@@ -202,6 +202,29 @@ def scan_folders(parent: Path, selected_names: list[str] | None = None) -> list[
     return [scan_folder(folder) for folder in folders]
 
 
+def resolve_batch_folder_fields(
+    brs_path: str,
+    form_document_name: str = "",
+    form_section_1_1: str = "",
+    form_section_1_3: str = "",
+    form_section_2_1: str = "",
+) -> tuple[str, str, str, str, bool, str]:
+    """Use form edits when provided, otherwise re-extract from the BRS file."""
+    review = extract_for_review(Path(brs_path))
+    document_name = form_document_name.strip() or review.document_name.strip()
+    section_1_1 = form_section_1_1.strip() or review.sections.get("1.1", "").strip()
+    section_1_3 = form_section_1_3.strip() or review.sections.get("1.3", "").strip()
+    section_2_1 = form_section_2_1.strip() or review.sections.get("2.1", "").strip()
+    return (
+        document_name,
+        section_1_1,
+        section_1_3,
+        section_2_1,
+        review.is_structured,
+        review.raw_content,
+    )
+
+
 def generate_folder_documents(
     item: BatchFolderResult,
     selected_documents: set[str],
@@ -213,13 +236,13 @@ def generate_folder_documents(
     section_1_3: str,
     section_2_1: str,
     document_name: str,
-) -> Path:
+) -> list[tuple[str, Path]]:
     if item.error:
         raise ValueError(f"{item.folder_name}: {item.error}")
     if not section_1_1 or not section_1_3 or not section_2_1:
-        raise ValueError(f"{item.folder_name}: BRS sections 1.1, 1.3, and 2.1 are required.")
+        raise ValueError("BRS sections 1, 2, and 3 are required.")
     if not document_name:
-        raise ValueError(f"{item.folder_name}: Document name is required.")
+        raise ValueError("Document name is required.")
 
     brs_path = Path(item.brs_path)
     testcase_path = Path(item.testcase_path) if item.testcase_path else None
@@ -235,13 +258,18 @@ def generate_folder_documents(
         section_2_1=section_2_1,
         document_name=document_name,
     )
-    outputs = generate_documents(
+    return generate_documents(
         brs_path=brs_path,
         context=context,
         selected=selected_documents,
         testcase_path=testcase_path,
     )
-    return create_zip_bundle(outputs, item.cr_number)
+
+
+def write_batch_zip_to_parent(zip_path: Path, parent: Path) -> Path:
+    destination = parent / "Project_Documents_Batch.zip"
+    shutil.copy2(zip_path, destination)
+    return destination
 
 
 def write_zip_to_folder(zip_path: Path, folder: Path, cr_number: str) -> Path:

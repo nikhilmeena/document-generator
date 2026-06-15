@@ -268,7 +268,7 @@
     <div class="card">
       <h1>Batch folder review</h1>
       <p class="subtitle">
-        Review extracted BRS and test case files folder by folder. Edit section content where needed, then generate a zip file inside each selected folder.
+        Review extracted BRS and test case files folder by folder. Edit section content where needed, then generate a single zip file in the parent folder.
       </p>
 
       <div class="meta-box">
@@ -284,7 +284,7 @@
         {% endfor %}
       </div>
 
-      <form action="{{ url_for('batch_generate') }}" method="post">
+      <form id="batch-generate-form" action="{{ url_for('batch_generate') }}" method="post">
         <input type="hidden" name="parent_path" value="{{ parent_path }}">
         <input type="hidden" name="deployment_date" value="{{ deployment_date }}">
         <input type="hidden" name="files_components" value="{{ files_components }}">
@@ -320,6 +320,12 @@
                     {% if not item.error %}checked{% endif %}
                     {% if item.error %}disabled{% endif %}
                   >
+                  {% if not item.error %}
+                    <input type="hidden" name="folder_path_{{ loop.index0 }}" value="{{ item.folder_path }}">
+                    <input type="hidden" name="cr_number_{{ loop.index0 }}" value="{{ item.cr_number }}">
+                    <input type="hidden" name="brs_path_{{ loop.index0 }}" value="{{ item.brs_path }}">
+                    <input type="hidden" name="testcase_path_{{ loop.index0 }}" value="{{ item.testcase_path }}">
+                  {% endif %}
                 </td>
                 <td>{{ item.folder_name }}</td>
                 <td>{{ item.cr_number }}</td>
@@ -346,7 +352,7 @@
                   {% elif item.is_structured %}
                     <span class="status-ok">Structured</span>
                   {% else %}
-                    <span class="status-warn">Manual sections</span>
+                    <span class="status-warn">Unstructured</span>
                   {% endif %}
                 </td>
                 <td>
@@ -395,14 +401,9 @@
               </tr>
               {% endif %}
               {% if not item.error %}
-              <tr id="details-{{ loop.index0 }}" class="details-row" hidden>
+              <tr id="details-{{ loop.index0 }}" class="details-row"{% if not item.sections.get("1.1") and not item.sections.get("1.3") and not item.sections.get("2.1") %} hidden{% endif %}>
                 <td colspan="8">
                   <div class="details-panel">
-                    <input type="hidden" name="folder_path_{{ loop.index0 }}" value="{{ item.folder_path }}">
-                    <input type="hidden" name="cr_number_{{ loop.index0 }}" value="{{ item.cr_number }}">
-                    <input type="hidden" name="brs_path_{{ loop.index0 }}" value="{{ item.brs_path }}">
-                    <input type="hidden" name="testcase_path_{{ loop.index0 }}" value="{{ item.testcase_path }}">
-
                     <label class="field-label" for="document_name_{{ loop.index0 }}">Document name</label>
                     <input
                       class="pill-input"
@@ -410,7 +411,6 @@
                       id="document_name_{{ loop.index0 }}"
                       name="document_name_{{ loop.index0 }}"
                       value="{{ item.document_name }}"
-                      required
                       style="margin-bottom: 12px;"
                     >
 
@@ -421,16 +421,16 @@
 
                     <div class="details-grid">
                       <div>
-                        <label class="field-label" for="section_1_1_{{ loop.index0 }}">BRS 1.1</label>
-                        <textarea id="section_1_1_{{ loop.index0 }}" name="section_1_1_{{ loop.index0 }}" required>{{ item.sections.get("1.1", "") }}</textarea>
+                        <label class="field-label" for="section_1_1_{{ loop.index0 }}">1</label>
+                        <textarea id="section_1_1_{{ loop.index0 }}" name="section_1_1_{{ loop.index0 }}">{{ item.sections.get("1.1", "") }}</textarea>
                       </div>
                       <div>
-                        <label class="field-label" for="section_1_3_{{ loop.index0 }}">BRS 1.3</label>
-                        <textarea id="section_1_3_{{ loop.index0 }}" name="section_1_3_{{ loop.index0 }}" required>{{ item.sections.get("1.3", "") }}</textarea>
+                        <label class="field-label" for="section_1_3_{{ loop.index0 }}">2</label>
+                        <textarea id="section_1_3_{{ loop.index0 }}" name="section_1_3_{{ loop.index0 }}">{{ item.sections.get("1.3", "") }}</textarea>
                       </div>
                       <div>
-                        <label class="field-label" for="section_2_1_{{ loop.index0 }}">BRS 2.1</label>
-                        <textarea id="section_2_1_{{ loop.index0 }}" name="section_2_1_{{ loop.index0 }}" required>{{ item.sections.get("2.1", "") }}</textarea>
+                        <label class="field-label" for="section_2_1_{{ loop.index0 }}">3</label>
+                        <textarea id="section_2_1_{{ loop.index0 }}" name="section_2_1_{{ loop.index0 }}">{{ item.sections.get("2.1", "") }}</textarea>
                       </div>
                     </div>
                   </div>
@@ -444,7 +444,7 @@
 
         <div class="actions">
           <a class="btn btn-secondary" href="{{ url_for('index') }}">Back</a>
-          <button class="btn btn-primary" type="submit">Generate folder zip files</button>
+          <button class="btn btn-primary" type="submit">Generate batch zip file</button>
         </div>
       </form>
     </div>
@@ -461,6 +461,21 @@
       button.addEventListener("click", () => {
         const row = document.getElementById(button.dataset.target);
         row.hidden = !row.hidden;
+      });
+    });
+
+    document.getElementById("batch-generate-form").addEventListener("submit", (event) => {
+      const form = event.target;
+      form.querySelectorAll(".details-row [name]").forEach((field) => {
+        if (!field.name || field.disabled) {
+          return;
+        }
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = field.name;
+        hidden.value = field.value;
+        form.appendChild(hidden);
+        field.disabled = true;
       });
     });
   </script>

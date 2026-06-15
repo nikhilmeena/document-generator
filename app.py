@@ -10,13 +10,15 @@ from batch_processor import (
     BatchFolderResult,
     generate_folder_documents,
     list_batch_folders,
+    resolve_batch_folder_fields,
     safe_parent_path,
     scan_folders,
-    write_zip_to_folder,
+    write_batch_zip_to_parent,
 )
 from generators import (
     DOCUMENT_TYPES,
     build_context,
+    create_combined_zip_bundle,
     create_zip_bundle,
     extract_review_data,
     generate_documents,
@@ -214,7 +216,7 @@ def generate():
         return redirect(url_for("index"))
 
     if not section_1_1 or not section_1_3 or not section_2_1:
-        flash("BRS sections 1.1, 1.3, and 2.1 are required.", "error")
+        flash("BRS sections 1, 2, and 3 are required.", "error")
         return redirect(url_for("index"))
 
     try:
@@ -273,6 +275,7 @@ def batch_generate():
 
     generated: list[str] = []
     errors: list[str] = []
+    folder_outputs: list[tuple[str, list]] = []
 
     for row_index in selected_rows:
         folder_path = request.form.get(f"folder_path_{row_index}", "").strip()
@@ -288,6 +291,29 @@ def batch_generate():
         brs_path = request.form.get(f"brs_path_{row_index}", "").strip()
         testcase_path = request.form.get(f"testcase_path_{row_index}", "").strip()
 
+        if not brs_path:
+            errors.append(f"{folder.name}: BRS file path missing.")
+            continue
+
+        try:
+            (
+                document_name,
+                section_1_1,
+                section_1_3,
+                section_2_1,
+                is_structured,
+                raw_content,
+            ) = resolve_batch_folder_fields(
+                brs_path=brs_path,
+                form_document_name=document_name,
+                form_section_1_1=section_1_1,
+                form_section_1_3=section_1_3,
+                form_section_2_1=section_2_1,
+            )
+        except Exception as error:
+            errors.append(f"{folder.name}: Failed to read BRS: {error}")
+            continue
+
         item = BatchFolderResult(
             folder_path=str(folder),
             folder_name=folder.name,
@@ -296,9 +322,13 @@ def batch_generate():
             brs_path=brs_path,
             testcase_file=Path(testcase_path).name if testcase_path else "",
             testcase_path=testcase_path,
+            testcase_sheet="",
+            testcase_headers=[],
+            testcase_rows=[],
+            testcase_row_count=0,
             document_name=document_name,
-            is_structured=True,
-            raw_content="",
+            is_structured=is_structured,
+            raw_content=raw_content,
             sections={
                 "1.1": section_1_1,
                 "1.3": section_1_3,
@@ -307,7 +337,7 @@ def batch_generate():
         )
 
         try:
-            zip_path = generate_folder_documents(
+            outputs = generate_folder_documents(
                 item=item,
                 selected_documents=selected_documents,
                 deployment_date=deployment_date,
@@ -319,10 +349,17 @@ def batch_generate():
                 section_2_1=section_2_1,
                 document_name=document_name,
             )
-            destination = write_zip_to_folder(zip_path, folder, cr_number)
-            generated.append(str(destination))
+            folder_outputs.append((cr_number, outputs))
         except Exception as error:
             errors.append(f"{folder.name}: {error}")
+
+    if folder_outputs:
+        try:
+            zip_path = create_combined_zip_bundle(folder_outputs)
+            destination = write_batch_zip_to_parent(zip_path, Path(parent_path))
+            generated.append(str(destination))
+        except Exception as error:
+            errors.append(f"Failed to create batch zip: {error}")
 
     if errors and not generated:
         flash("Batch generation failed: " + " | ".join(errors), "error")
@@ -330,11 +367,15 @@ def batch_generate():
 
     if errors:
         flash(
-            f"Generated {len(generated)} folder zip(s). Errors: " + " | ".join(errors),
+            f"Generated batch zip with {len(folder_outputs)} folder(s). Errors: "
+            + " | ".join(errors),
             "error",
         )
     else:
-        flash(f"Generated {len(generated)} folder zip file(s) successfully.", "success")
+        flash(
+            f"Generated batch zip with {len(folder_outputs)} folder(s) successfully.",
+            "success",
+        )
 
     return render_template(
         "batch_complete.html",

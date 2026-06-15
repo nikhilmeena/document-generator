@@ -134,12 +134,19 @@ def generate_documents(
 
 
 def create_zip_bundle(files: list[tuple[str, Path]], cr_number: str) -> Path:
+    return create_combined_zip_bundle([(cr_number, files)])
+
+
+def create_combined_zip_bundle(
+    folder_outputs: list[tuple[str, list[tuple[str, Path]]]],
+) -> Path:
     with NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
         zip_path = Path(temp_file.name)
 
-    safe_cr = cr_number.replace("/", "-")
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for filename, path in files:
-            archive.write(path, arcname=f"{safe_cr}/{filename}")
+        for cr_number, files in folder_outputs:
+            safe_cr = cr_number.replace("/", "-")
+            for filename, path in files:
+                archive.write(path, arcname=f"{safe_cr}/{filename}")
 
     return zip_path

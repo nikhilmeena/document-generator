@@ -100,11 +100,11 @@
   <div class="page">
     <div class="card">
       <h1>Batch generation complete</h1>
-      <p class="subtitle">Zip files were written into each selected folder under {{ parent_path }}.</p>
+      <p class="subtitle">A single zip file was written to the parent folder {{ parent_path }}.</p>
 
       {% if generated_files %}
       <div class="success-box">
-        <strong>Generated {{ generated_files|length }} zip file(s):</strong>
+        <strong>Generated batch zip:</strong>
         <ul>
           {% for path in generated_files %}
             <li>{{ path }}</li>
