@@ -18,6 +18,7 @@ TEST_CASE_SHEET_ALIASES = (
     "Test cases",
     "Sheet1",
 )
+TESTCASE_FILENAME_PREFIX = "testcase_"
 OUTPUT_SHEET = "Change_Requests"
 OVERWRITE_START_ROW = 10
 YELLOW_FILLS = {"FFFFFF00", "FFFF00"}
@@ -103,6 +104,38 @@ def _copy_test_case_block(source_ws, target_ws, start_row: int) -> int:
         rows_copied += 1
 
     return rows_copied
+
+
+def extract_testcase_preview(
+    testcase_path: Path,
+    max_rows: int = 12,
+) -> dict[str, object]:
+    """Read a preview of rows from an uploaded test case workbook."""
+    workbook = load_workbook(testcase_path, read_only=True, data_only=True)
+    sheet_name = _resolve_test_case_sheet(workbook.sheetnames)
+    worksheet = workbook[sheet_name]
+
+    preview_rows: list[list[str]] = []
+    total_rows = 0
+    for source_row in worksheet.iter_rows(min_row=1, values_only=True):
+        if not any(value is not None and str(value).strip() for value in source_row):
+            continue
+        total_rows += 1
+        if len(preview_rows) < max_rows:
+            preview_rows.append(
+                ["" if value is None else str(value).strip() for value in source_row]
+            )
+
+    workbook.close()
+    headers = preview_rows[0] if preview_rows else []
+    rows = preview_rows[1:] if len(preview_rows) > 1 else []
+
+    return {
+        "sheet_name": sheet_name,
+        "headers": headers,
+        "rows": rows,
+        "total_rows": total_rows,
+    }
 
 
 def generate_system_test_cases(

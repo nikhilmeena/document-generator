@@ -9,13 +9,13 @@ from pathlib import Path
 
 from brs_parser import extract_for_review
 from generators import build_context, create_zip_bundle, generate_documents
+from generators.system_test_cases import TESTCASE_FILENAME_PREFIX, extract_testcase_preview
 
 SKIP_DOCX = {
     "approch document.docx",
     "impact document.docx",
     "uat_deploymentnote.docx",
 }
-GENERATED_XLSX = {"system_test_cases.xlsx"}
 CR_FOLDER_PATTERN = re.compile(r"^CR-\d+-\d+$", re.IGNORECASE)
 
 
@@ -28,10 +28,15 @@ class BatchFolderResult:
     brs_path: str
     testcase_file: str
     testcase_path: str
+    testcase_sheet: str
+    testcase_headers: list[str]
+    testcase_rows: list[list[str]]
+    testcase_row_count: int
     document_name: str
     is_structured: bool
     raw_content: str
     sections: dict[str, str] = field(default_factory=dict)
+    testcase_error: str = ""
     error: str = ""
 
 
@@ -74,33 +79,58 @@ def find_brs_file(folder: Path) -> Path | None:
 
 
 def find_testcase_file(folder: Path) -> Path | None:
-    spreadsheets = [
+    matches = [
         item
         for item in folder.iterdir()
-        if item.is_file() and item.suffix.lower() in {".xlsx", ".xlsm"}
+        if item.is_file()
+        and item.suffix.lower() in {".xlsx", ".xlsm"}
+        and item.name.lower().startswith(TESTCASE_FILENAME_PREFIX)
     ]
-    if not spreadsheets:
+    if not matches:
         return None
+    return sorted(matches, key=lambda item: item.name.lower())[0]
 
-    candidate_spreadsheets = [
-        item for item in spreadsheets if item.name.lower() not in GENERATED_XLSX
-    ]
-    if not candidate_spreadsheets:
-        return None
 
-    for item in candidate_spreadsheets:
-        lowered = item.name.lower()
-        if "testcase" in lowered or "test case" in lowered:
-            return item
+def _empty_testcase_fields() -> dict[str, object]:
+    return {
+        "testcase_sheet": "",
+        "testcase_headers": [],
+        "testcase_rows": [],
+        "testcase_row_count": 0,
+    }
 
-    if len(candidate_spreadsheets) == 1:
-        return candidate_spreadsheets[0]
-    return None
+
+def _testcase_fields_for_file(testcase: Path | None) -> dict[str, object]:
+    if testcase is None:
+        return _empty_testcase_fields()
+
+    try:
+        preview = extract_testcase_preview(testcase)
+    except Exception as error:
+        return {
+            "testcase_sheet": "",
+            "testcase_headers": [],
+            "testcase_rows": [],
+            "testcase_row_count": 0,
+            "testcase_error": str(error),
+        }
+
+    fields = {
+        "testcase_sheet": str(preview["sheet_name"]),
+        "testcase_headers": list(preview["headers"]),
+        "testcase_rows": list(preview["rows"]),
+        "testcase_row_count": int(preview["total_rows"]),
+    }
+    return fields
 
 
 def scan_folder(folder: Path) -> BatchFolderResult:
     folder = folder.resolve()
     brs = find_brs_file(folder)
+    testcase = find_testcase_file(folder)
+    testcase_fields = _testcase_fields_for_file(testcase)
+    testcase_error = testcase_fields.pop("testcase_error", "")
+
     if not brs:
         return BatchFolderResult(
             folder_path=str(folder),
@@ -108,15 +138,19 @@ def scan_folder(folder: Path) -> BatchFolderResult:
             cr_number=folder.name,
             brs_file="",
             brs_path="",
-            testcase_file="",
-            testcase_path="",
+            testcase_file=testcase.name if testcase else "",
+            testcase_path=str(testcase) if testcase else "",
+            testcase_sheet=str(testcase_fields["testcase_sheet"]),
+            testcase_headers=list(testcase_fields["testcase_headers"]),
+            testcase_rows=list(testcase_fields["testcase_rows"]),
+            testcase_row_count=int(testcase_fields["testcase_row_count"]),
             document_name="",
             is_structured=False,
             raw_content="",
+            testcase_error=str(testcase_error),
             error="No BRS document found in folder.",
         )
 
-    testcase = find_testcase_file(folder)
     try:
         review = extract_for_review(brs)
     except Exception as error:
@@ -128,9 +162,14 @@ def scan_folder(folder: Path) -> BatchFolderResult:
             brs_path=str(brs),
             testcase_file=testcase.name if testcase else "",
             testcase_path=str(testcase) if testcase else "",
+            testcase_sheet=str(testcase_fields["testcase_sheet"]),
+            testcase_headers=list(testcase_fields["testcase_headers"]),
+            testcase_rows=list(testcase_fields["testcase_rows"]),
+            testcase_row_count=int(testcase_fields["testcase_row_count"]),
             document_name="",
             is_structured=False,
             raw_content="",
+            testcase_error=str(testcase_error),
             error=f"Failed to read BRS: {error}",
         )
 
@@ -142,10 +181,15 @@ def scan_folder(folder: Path) -> BatchFolderResult:
         brs_path=str(brs),
         testcase_file=testcase.name if testcase else "",
         testcase_path=str(testcase) if testcase else "",
+        testcase_sheet=str(testcase_fields["testcase_sheet"]),
+        testcase_headers=list(testcase_fields["testcase_headers"]),
+        testcase_rows=list(testcase_fields["testcase_rows"]),
+        testcase_row_count=int(testcase_fields["testcase_row_count"]),
         document_name=review.document_name,
         is_structured=review.is_structured,
         raw_content=review.raw_content,
         sections=dict(review.sections),
+        testcase_error=str(testcase_error),
     )
 
 

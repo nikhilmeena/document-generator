@@ -183,6 +183,47 @@
       border: none;
       background: none;
       padding: 0;
+      margin-right: 8px;
+    }
+
+    .testcase-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .nested-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin: 12px 0 16px;
+      background: #fff;
+    }
+
+    .nested-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .nested-table th,
+    .nested-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .nested-table th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+
+    .section-heading {
+      margin: 16px 0 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
     }
 
     .actions {
@@ -283,7 +324,21 @@
                 <td>{{ item.folder_name }}</td>
                 <td>{{ item.cr_number }}</td>
                 <td>{{ item.brs_file or "—" }}</td>
-                <td>{{ item.testcase_file or "Default template rows 1–11" }}</td>
+                <td>
+                  {% if item.testcase_file %}
+                    <div>{{ item.testcase_file }}</div>
+                    <div class="testcase-meta">
+                      {% if item.testcase_row_count %}
+                        {{ item.testcase_row_count }} row(s)
+                        {% if item.testcase_sheet %} · sheet: {{ item.testcase_sheet }}{% endif %}
+                      {% elif item.testcase_error %}
+                        <span class="status-error">{{ item.testcase_error }}</span>
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    Default template rows 1–11
+                  {% endif %}
+                </td>
                 <td>{{ item.document_name or "—" }}</td>
                 <td>
                   {% if item.error %}
@@ -297,9 +352,48 @@
                 <td>
                   {% if not item.error %}
                     <button type="button" class="toggle-link" data-target="details-{{ loop.index0 }}">Edit sections</button>
+                    {% if item.testcase_rows or item.testcase_headers %}
+                      <button type="button" class="toggle-link" data-target="testcases-{{ loop.index0 }}">View test cases</button>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>
+              {% if not item.error and (item.testcase_rows or item.testcase_headers) %}
+              <tr id="testcases-{{ loop.index0 }}" class="details-row" hidden>
+                <td colspan="8">
+                  <div class="details-panel">
+                    <div class="section-heading">Test cases — {{ item.testcase_file }}</div>
+                    <div class="nested-table-wrap">
+                      <table class="nested-table">
+                        {% if item.testcase_headers %}
+                        <thead>
+                          <tr>
+                            {% for header in item.testcase_headers %}
+                              <th>{{ header or "—" }}</th>
+                            {% endfor %}
+                          </tr>
+                        </thead>
+                        {% endif %}
+                        <tbody>
+                          {% for row in item.testcase_rows %}
+                          <tr>
+                            {% for cell in row %}
+                              <td>{{ cell or "—" }}</td>
+                            {% endfor %}
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                    {% if item.testcase_row_count > 12 %}
+                    <div class="testcase-meta">
+                      Showing preview of {{ item.testcase_row_count }} total non-empty row(s).
+                    </div>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endif %}
               {% if not item.error %}
               <tr id="details-{{ loop.index0 }}" class="details-row" hidden>
                 <td colspan="8">
