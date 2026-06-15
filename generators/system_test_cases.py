@@ -107,13 +107,9 @@ def _copy_test_case_block(source_ws, target_ws, start_row: int) -> int:
 
 def generate_system_test_cases(
     template_path: Path,
-    testcase_path: Path,
+    testcase_path: Path | None,
     context: ProjectContext,
 ) -> Path:
-    preview_workbook = load_workbook(testcase_path, read_only=True)
-    test_case_sheet = _resolve_test_case_sheet(preview_workbook.sheetnames)
-    preview_workbook.close()
-
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
         output_path = Path(temp_file.name)
 
@@ -126,15 +122,21 @@ def generate_system_test_cases(
 
     worksheet = workbook[OUTPUT_SHEET]
     _fill_yellow_cells(worksheet, context)
-    _clear_from_row(worksheet, OVERWRITE_START_ROW)
 
-    source_workbook = load_workbook(testcase_path, read_only=True, data_only=True)
-    source_ws = source_workbook[test_case_sheet]
-    rows_copied = _copy_test_case_block(source_ws, worksheet, OVERWRITE_START_ROW)
-    source_workbook.close()
+    if testcase_path is not None:
+        preview_workbook = load_workbook(testcase_path, read_only=True)
+        test_case_sheet = _resolve_test_case_sheet(preview_workbook.sheetnames)
+        preview_workbook.close()
 
-    if rows_copied == 0:
-        raise ValueError("Uploaded test case sheet has no rows to copy.")
+        _clear_from_row(worksheet, OVERWRITE_START_ROW)
+
+        source_workbook = load_workbook(testcase_path, read_only=True, data_only=True)
+        source_ws = source_workbook[test_case_sheet]
+        rows_copied = _copy_test_case_block(source_ws, worksheet, OVERWRITE_START_ROW)
+        source_workbook.close()
+
+        if rows_copied == 0:
+            raise ValueError("Uploaded test case sheet has no rows to copy.")
 
     workbook.save(output_path)
     return output_path

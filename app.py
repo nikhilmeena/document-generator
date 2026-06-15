@@ -82,10 +82,6 @@ def review():
         testcase_name = secure_filename(testcase_file.filename)
         testcase_file.save(UPLOAD_DIR / testcase_name)
 
-    if "system_test_cases" in selected and not testcase_name:
-        flash("System Test Cases requires an uploaded test case workbook (.xlsx).", "error")
-        return redirect(url_for("index"))
-
     try:
         review_data = extract_review_data(brs_path)
     except ValueError as error:

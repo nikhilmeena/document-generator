@@ -33,7 +33,6 @@ DOCUMENT_TYPES = {
         "label": "System Test Cases",
         "template": "System_Test_cases.xlsx",
         "filename": "System_Test_Cases.xlsx",
-        "requires_testcase": True,
     },
     "uat_deployment": {
         "label": "UAT Deployment Note",
@@ -108,11 +107,6 @@ def generate_documents(
         template_path = TEMPLATE_DIR / meta["template"]
         if not template_path.exists():
             raise ValueError(f"Missing template: {meta['template']}")
-
-        if meta.get("requires_testcase") and testcase_path is None:
-            raise ValueError(
-                "System Test Cases requires an uploaded test case workbook."
-            )
 
         if doc_type == "approach":
             path = generate_approach_document(template_path, context)
