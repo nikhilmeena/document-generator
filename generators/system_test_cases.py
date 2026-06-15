@@ -12,9 +12,30 @@ from openpyxl import load_workbook
 from models.project_context import ProjectContext
 
 TEST_CASE_SHEET = "Test Cases"
+TEST_CASE_SHEET_ALIASES = (
+    TEST_CASE_SHEET,
+    "TestCases",
+    "Test cases",
+    "Sheet1",
+)
 OUTPUT_SHEET = "Change_Requests"
 OVERWRITE_START_ROW = 10
 YELLOW_FILLS = {"FFFFFF00", "FFFF00"}
+
+
+def _resolve_test_case_sheet(sheetnames: list[str]) -> str:
+    for name in TEST_CASE_SHEET_ALIASES:
+        if name in sheetnames:
+            return name
+
+    if len(sheetnames) == 1:
+        return sheetnames[0]
+
+    available = ", ".join(sheetnames)
+    raise ValueError(
+        f"Uploaded test case file must contain a '{TEST_CASE_SHEET}' sheet. "
+        f"Found: {available}."
+    )
 
 
 def _parse_date(value: str) -> datetime:
@@ -89,10 +110,9 @@ def generate_system_test_cases(
     testcase_path: Path,
     context: ProjectContext,
 ) -> Path:
-    if TEST_CASE_SHEET not in load_workbook(testcase_path, read_only=True).sheetnames:
-        raise ValueError(
-            f"Uploaded test case file must contain a '{TEST_CASE_SHEET}' sheet."
-        )
+    preview_workbook = load_workbook(testcase_path, read_only=True)
+    test_case_sheet = _resolve_test_case_sheet(preview_workbook.sheetnames)
+    preview_workbook.close()
 
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
         output_path = Path(temp_file.name)
@@ -109,7 +129,7 @@ def generate_system_test_cases(
     _clear_from_row(worksheet, OVERWRITE_START_ROW)
 
     source_workbook = load_workbook(testcase_path, read_only=True, data_only=True)
-    source_ws = source_workbook[TEST_CASE_SHEET]
+    source_ws = source_workbook[test_case_sheet]
     rows_copied = _copy_test_case_block(source_ws, worksheet, OVERWRITE_START_ROW)
     source_workbook.close()
 
