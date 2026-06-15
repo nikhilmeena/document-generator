@@ -3,9 +3,17 @@
 import os
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
+from batch_processor import (
+    BatchFolderResult,
+    generate_folder_documents,
+    list_batch_folders,
+    safe_parent_path,
+    scan_folders,
+    write_zip_to_folder,
+)
 from generators import (
     DOCUMENT_TYPES,
     build_context,
@@ -20,6 +28,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 ALLOWED_BRS_EXTENSIONS = {".docx"}
 ALLOWED_TESTCASE_EXTENSIONS = {".xlsx", ".xlsm"}
+BATCH_ROOT = Path(os.environ.get("BATCH_ROOT", str(Path.home() / "Downloads")))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "release-deployment-dev-key")
@@ -38,9 +47,34 @@ def _safe_upload_path(filename: str) -> Path:
     return path
 
 
+def _batch_root() -> Path:
+    return BATCH_ROOT.expanduser().resolve()
+
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html", document_types=DOCUMENT_TYPES)
+
+
+@app.route("/batch/folders", methods=["POST"])
+def batch_folders():
+    parent_path = request.form.get("parent_path", "").strip()
+    if not parent_path:
+        return jsonify({"error": "Enter a parent folder path."}), 400
+
+    try:
+        parent = safe_parent_path(parent_path, _batch_root())
+        folders = [
+            {"name": folder.name, "path": str(folder)}
+            for folder in list_batch_folders(parent)
+        ]
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    if not folders:
+        return jsonify({"error": "No subfolders found in the selected path."}), 400
+
+    return jsonify({"folders": folders, "parent_path": str(parent)})
 
 
 @app.route("/review", methods=["POST"])
@@ -109,6 +143,52 @@ def review():
     )
 
 
+@app.route("/batch/review", methods=["POST"])
+def batch_review():
+    parent_path = request.form.get("parent_path", "").strip()
+    selected_folders = request.form.getlist("batch_folders")
+    deployment_date = request.form.get("deployment_date", "").strip()
+    files_components = request.form.get("files_components", "").strip()
+    spoc_name = request.form.get("spoc_name", "").strip() or "Nikhil"
+    comments = request.form.get("comments", "").strip()
+    selected_documents = request.form.getlist("documents")
+
+    if not parent_path:
+        flash("Enter the parent folder path for batch processing.", "error")
+        return redirect(url_for("index"))
+    if not selected_folders:
+        flash("Select at least one folder to process.", "error")
+        return redirect(url_for("index"))
+    if not deployment_date or not files_components:
+        flash("Please fill in deployment date and files/components.", "error")
+        return redirect(url_for("index"))
+    if not selected_documents:
+        flash("Please select at least one document to generate.", "error")
+        return redirect(url_for("index"))
+
+    try:
+        parent = safe_parent_path(parent_path, _batch_root())
+        folder_results = scan_folders(parent, selected_folders)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(url_for("index"))
+    except Exception as error:
+        flash(f"Failed to scan folders: {error}", "error")
+        return redirect(url_for("index"))
+
+    return render_template(
+        "batch_review.html",
+        document_types=DOCUMENT_TYPES,
+        parent_path=str(parent),
+        folder_results=folder_results,
+        deployment_date=deployment_date,
+        files_components=files_components,
+        spoc_name=spoc_name,
+        comments=comments,
+        selected_documents=selected_documents,
+    )
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
     brs_filename = request.form.get("brs_filename", "").strip()
@@ -174,6 +254,93 @@ def generate():
         as_attachment=True,
         download_name=download_name,
         mimetype="application/zip",
+    )
+
+
+@app.route("/batch/generate", methods=["POST"])
+def batch_generate():
+    parent_path = request.form.get("parent_path", "").strip()
+    deployment_date = request.form.get("deployment_date", "").strip()
+    files_components = request.form.get("files_components", "").strip()
+    spoc_name = request.form.get("spoc_name", "").strip() or "Nikhil"
+    comments = request.form.get("comments", "").strip()
+    selected_documents = set(request.form.getlist("documents"))
+    selected_rows = request.form.getlist("selected_rows")
+
+    if not parent_path or not selected_rows or not selected_documents:
+        flash("Missing batch session. Please start again.", "error")
+        return redirect(url_for("index"))
+
+    generated: list[str] = []
+    errors: list[str] = []
+
+    for row_index in selected_rows:
+        folder_path = request.form.get(f"folder_path_{row_index}", "").strip()
+        if not folder_path:
+            continue
+
+        folder = Path(folder_path)
+        document_name = request.form.get(f"document_name_{row_index}", "").strip()
+        section_1_1 = request.form.get(f"section_1_1_{row_index}", "").strip()
+        section_1_3 = request.form.get(f"section_1_3_{row_index}", "").strip()
+        section_2_1 = request.form.get(f"section_2_1_{row_index}", "").strip()
+        cr_number = request.form.get(f"cr_number_{row_index}", folder.name).strip()
+        brs_path = request.form.get(f"brs_path_{row_index}", "").strip()
+        testcase_path = request.form.get(f"testcase_path_{row_index}", "").strip()
+
+        item = BatchFolderResult(
+            folder_path=str(folder),
+            folder_name=folder.name,
+            cr_number=cr_number,
+            brs_file=Path(brs_path).name if brs_path else "",
+            brs_path=brs_path,
+            testcase_file=Path(testcase_path).name if testcase_path else "",
+            testcase_path=testcase_path,
+            document_name=document_name,
+            is_structured=True,
+            raw_content="",
+            sections={
+                "1.1": section_1_1,
+                "1.3": section_1_3,
+                "2.1": section_2_1,
+            },
+        )
+
+        try:
+            zip_path = generate_folder_documents(
+                item=item,
+                selected_documents=selected_documents,
+                deployment_date=deployment_date,
+                files_components=files_components,
+                spoc_name=spoc_name,
+                comments=comments,
+                section_1_1=section_1_1,
+                section_1_3=section_1_3,
+                section_2_1=section_2_1,
+                document_name=document_name,
+            )
+            destination = write_zip_to_folder(zip_path, folder, cr_number)
+            generated.append(str(destination))
+        except Exception as error:
+            errors.append(f"{folder.name}: {error}")
+
+    if errors and not generated:
+        flash("Batch generation failed: " + " | ".join(errors), "error")
+        return redirect(url_for("index"))
+
+    if errors:
+        flash(
+            f"Generated {len(generated)} folder zip(s). Errors: " + " | ".join(errors),
+            "error",
+        )
+    else:
+        flash(f"Generated {len(generated)} folder zip file(s) successfully.", "success")
+
+    return render_template(
+        "batch_complete.html",
+        generated_files=generated,
+        errors=errors,
+        parent_path=parent_path,
     )
 
 

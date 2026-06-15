@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Complete — Document Maker</title>
+  <style>
+    :root {
+      --card: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --border: #e8e8e8;
+      --drop-bg: #f3f4f6;
+      --btn: #1a1a1a;
+      --success-bg: #ecfdf5;
+      --success-text: #047857;
+      --error-bg: #fef2f2;
+      --error-text: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: url("{{ url_for('static', filename='images/background.png') }}") center / cover no-repeat fixed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .page { width: 100%; max-width: 720px; }
+
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 32px 28px 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+    }
+
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+
+    .subtitle {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .success-box, .error-box {
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .success-box {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid #a7f3d0;
+    }
+
+    .error-box {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid #fecaca;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-top: 18px;
+      padding: 16px 20px;
+      border-radius: 999px;
+      background: var(--btn);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Batch generation complete</h1>
+      <p class="subtitle">Zip files were written into each selected folder under {{ parent_path }}.</p>
+
+      {% if generated_files %}
+      <div class="success-box">
+        <strong>Generated {{ generated_files|length }} zip file(s):</strong>
+        <ul>
+          {% for path in generated_files %}
+            <li>{{ path }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if errors %}
+      <div class="error-box">
+        <strong>Some folders failed:</strong>
+        <ul>
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <a class="btn" href="{{ url_for('index') }}">Start another batch</a>
+    </div>
+  </div>
+</body>
+</html>

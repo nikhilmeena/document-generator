@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Review — Document Maker</title>
+  <style>
+    :root {
+      --card: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --border: #e8e8e8;
+      --drop-bg: #f3f4f6;
+      --btn: #1a1a1a;
+      --btn-hover: #333333;
+      --success-bg: #ecfdf5;
+      --success-text: #047857;
+      --warn-bg: #fffbeb;
+      --warn-text: #92400e;
+      --error-bg: #fef2f2;
+      --error-text: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: url("{{ url_for('static', filename='images/background.png') }}") center / cover no-repeat fixed;
+      padding: 24px;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 32px 28px 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .meta-box {
+      background: var(--drop-bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .meta-box strong {
+      display: inline-block;
+      min-width: 130px;
+    }
+
+    .doc-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .doc-chip {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 0.82rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--drop-bg);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-ok {
+      color: var(--success-text);
+      font-weight: 600;
+    }
+
+    .status-warn {
+      color: var(--warn-text);
+      font-weight: 600;
+    }
+
+    .status-error {
+      color: var(--error-text);
+      font-weight: 600;
+    }
+
+    .details-row td {
+      background: #fafafa;
+      padding-top: 0;
+    }
+
+    .details-panel {
+      padding: 12px 0 4px;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    textarea, .pill-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      line-height: 1.45;
+      resize: vertical;
+    }
+
+    textarea {
+      min-height: 120px;
+    }
+
+    .raw-box {
+      grid-column: 1 / -1;
+      min-height: 100px;
+      background: var(--drop-bg);
+    }
+
+    .toggle-link {
+      color: #2563eb;
+      cursor: pointer;
+      font-size: 0.82rem;
+      text-decoration: underline;
+      border: none;
+      background: none;
+      padding: 0;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 20px;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--btn);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    @media (max-width: 900px) {
+      .details-grid { grid-template-columns: 1fr; }
+      .actions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Batch folder review</h1>
+      <p class="subtitle">
+        Review extracted BRS and test case files folder by folder. Edit section content where needed, then generate a zip file inside each selected folder.
+      </p>
+
+      <div class="meta-box">
+        <div><strong>Parent folder</strong> {{ parent_path }}</div>
+        <div><strong>Deployment date</strong> {{ deployment_date }}</div>
+        <div><strong>Files / components</strong> {{ files_components }}</div>
+        <div><strong>SPOC</strong> {{ spoc_name }}</div>
+      </div>
+
+      <div class="doc-summary">
+        {% for key in selected_documents %}
+          <span class="doc-chip">{{ document_types[key].label }}</span>
+        {% endfor %}
+      </div>
+
+      <form action="{{ url_for('batch_generate') }}" method="post">
+        <input type="hidden" name="parent_path" value="{{ parent_path }}">
+        <input type="hidden" name="deployment_date" value="{{ deployment_date }}">
+        <input type="hidden" name="files_components" value="{{ files_components }}">
+        <input type="hidden" name="spoc_name" value="{{ spoc_name }}">
+        <input type="hidden" name="comments" value="{{ comments }}">
+        {% for key in selected_documents %}
+          <input type="hidden" name="documents" value="{{ key }}">
+        {% endfor %}
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="select-all" checked></th>
+                <th>Folder</th>
+                <th>CR number</th>
+                <th>BRS file</th>
+                <th>Test cases</th>
+                <th>Document name</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in folder_results %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    name="selected_rows"
+                    value="{{ loop.index0 }}"
+                    class="row-select"
+                    {% if not item.error %}checked{% endif %}
+                    {% if item.error %}disabled{% endif %}
+                  >
+                </td>
+                <td>{{ item.folder_name }}</td>
+                <td>{{ item.cr_number }}</td>
+                <td>{{ item.brs_file or "—" }}</td>
+                <td>{{ item.testcase_file or "Default template rows 1–11" }}</td>
+                <td>{{ item.document_name or "—" }}</td>
+                <td>
+                  {% if item.error %}
+                    <span class="status-error">{{ item.error }}</span>
+                  {% elif item.is_structured %}
+                    <span class="status-ok">Structured</span>
+                  {% else %}
+                    <span class="status-warn">Manual sections</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if not item.error %}
+                    <button type="button" class="toggle-link" data-target="details-{{ loop.index0 }}">Edit sections</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% if not item.error %}
+              <tr id="details-{{ loop.index0 }}" class="details-row" hidden>
+                <td colspan="8">
+                  <div class="details-panel">
+                    <input type="hidden" name="folder_path_{{ loop.index0 }}" value="{{ item.folder_path }}">
+                    <input type="hidden" name="cr_number_{{ loop.index0 }}" value="{{ item.cr_number }}">
+                    <input type="hidden" name="brs_path_{{ loop.index0 }}" value="{{ item.brs_path }}">
+                    <input type="hidden" name="testcase_path_{{ loop.index0 }}" value="{{ item.testcase_path }}">
+
+                    <label class="field-label" for="document_name_{{ loop.index0 }}">Document name</label>
+                    <input
+                      class="pill-input"
+                      type="text"
+                      id="document_name_{{ loop.index0 }}"
+                      name="document_name_{{ loop.index0 }}"
+                      value="{{ item.document_name }}"
+                      required
+                      style="margin-bottom: 12px;"
+                    >
+
+                    {% if not item.is_structured and item.raw_content %}
+                    <label class="field-label" for="raw_content_{{ loop.index0 }}">Extracted BRS content (reference)</label>
+                    <textarea id="raw_content_{{ loop.index0 }}" class="raw-box" readonly>{{ item.raw_content }}</textarea>
+                    {% endif %}
+
+                    <div class="details-grid">
+                      <div>
+                        <label class="field-label" for="section_1_1_{{ loop.index0 }}">BRS 1.1</label>
+                        <textarea id="section_1_1_{{ loop.index0 }}" name="section_1_1_{{ loop.index0 }}" required>{{ item.sections.get("1.1", "") }}</textarea>
+                      </div>
+                      <div>
+                        <label class="field-label" for="section_1_3_{{ loop.index0 }}">BRS 1.3</label>
+                        <textarea id="section_1_3_{{ loop.index0 }}" name="section_1_3_{{ loop.index0 }}" required>{{ item.sections.get("1.3", "") }}</textarea>
+                      </div>
+                      <div>
+                        <label class="field-label" for="section_2_1_{{ loop.index0 }}">BRS 2.1</label>
+                        <textarea id="section_2_1_{{ loop.index0 }}" name="section_2_1_{{ loop.index0 }}" required>{{ item.sections.get("2.1", "") }}</textarea>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="actions">
+          <a class="btn btn-secondary" href="{{ url_for('index') }}">Back</a>
+          <button class="btn btn-primary" type="submit">Generate folder zip files</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("select-all").addEventListener("change", (event) => {
+      document.querySelectorAll(".row-select:not(:disabled)").forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+    });
+
+    document.querySelectorAll(".toggle-link").forEach((button) => {
+      button.addEventListener("click", () => {
+        const row = document.getElementById(button.dataset.target);
+        row.hidden = !row.hidden;
+      });
+    });
+  </script>
+</body>
+</html>

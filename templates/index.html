@@ -15,6 +15,8 @@
       --btn-hover: #333333;
       --error-bg: #fef2f2;
       --error-text: #b91c1c;
+      --success-bg: #ecfdf5;
+      --success-text: #047857;
     }
 
     * { box-sizing: border-box; }
@@ -33,7 +35,11 @@
 
     .page {
       width: 100%;
-      max-width: 520px;
+      max-width: 560px;
+    }
+
+    .page.batch-mode {
+      max-width: 680px;
     }
 
     .card {
@@ -54,10 +60,34 @@
       margin-bottom: 16px;
       padding: 12px 14px;
       border-radius: 12px;
+      font-size: 0.92rem;
+      border: 1px solid #fecaca;
       background: var(--error-bg);
       color: var(--error-text);
-      border: 1px solid #fecaca;
+    }
+
+    .alert.success {
+      border-color: #a7f3d0;
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 16px;
       font-size: 0.92rem;
+      cursor: pointer;
+    }
+
+    .mode-toggle input {
+      width: 16px;
+      height: 16px;
+      accent-color: #111;
     }
 
     .drop-zone {
@@ -142,6 +172,64 @@
       grid-column: 1 / -1;
     }
 
+    .batch-path-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-secondary {
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .folder-list {
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fafafa;
+      margin-bottom: 8px;
+    }
+
+    .folder-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+
+    .folder-item input {
+      width: 16px;
+      height: 16px;
+      accent-color: #111;
+    }
+
+    .folder-empty, .folder-error {
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 8px 4px;
+    }
+
+    .folder-error {
+      color: var(--error-text);
+    }
+
     .doc-list {
       display: grid;
       gap: 8px;
@@ -191,53 +279,88 @@
       line-height: 1.4;
     }
 
+    .hidden {
+      display: none;
+    }
+
     @media (max-width: 540px) {
-      .field-grid { grid-template-columns: 1fr; }
+      .field-grid, .batch-path-row { grid-template-columns: 1fr; }
       .card { padding: 24px 18px 20px; border-radius: 22px; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
+  <div class="page" id="page">
     <div class="card">
       <h1>Upload your files</h1>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
-            <div class="alert">{{ message }}</div>
+            <div class="alert{% if category == 'success' %} success{% endif %}">{{ message }}</div>
           {% endfor %}
         {% endif %}
       {% endwith %}
 
+      <label class="mode-toggle">
+        <input type="checkbox" id="batch_mode" name="batch_mode" value="1">
+        Process multiple folders
+      </label>
+
       <form action="{{ url_for('review') }}" method="post" enctype="multipart/form-data" id="upload-form">
-        <div class="drop-zone" id="brs-drop">
-          <input type="file" id="brs_file" name="brs_file" accept=".docx" required>
-          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
-            <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <div class="drop-title">BRS document — drop here or click to browse</div>
-          <div class="drop-hint">DOCX only</div>
-          <div class="file-name" id="brs-file-name"></div>
+        <div id="single-mode">
+          <div class="drop-zone" id="brs-drop">
+            <input type="file" id="brs_file" name="brs_file" accept=".docx" required>
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
+              <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="drop-title">BRS document — drop here or click to browse</div>
+            <div class="drop-hint">DOCX only</div>
+            <div class="file-name" id="brs-file-name"></div>
+          </div>
+
+          <div class="drop-zone" id="testcase-drop">
+            <input type="file" id="testcase_file" name="testcase_file" accept=".xlsx,.xlsm">
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
+              <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="drop-title">Test case workbook — drop here or click to browse</div>
+            <div class="drop-hint">XLSX — optional; default template rows 1–11 used if omitted</div>
+            <div class="file-name" id="testcase-file-name"></div>
+          </div>
         </div>
 
-        <div class="drop-zone" id="testcase-drop">
-          <input type="file" id="testcase_file" name="testcase_file" accept=".xlsx,.xlsm">
-          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 16.5V18a2 2 0 002 2h12a2 2 0 002-2v-1.5" stroke-linecap="round"/>
-            <path d="M8 12.5h8a4 4 0 00-4-7 4 4 0 00-4 7z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <div class="drop-title">Test case workbook — drop here or click to browse</div>
-          <div class="drop-hint">XLSX — optional; default template rows 1–11 used if omitted</div>
-          <div class="file-name" id="testcase-file-name"></div>
+        <div id="batch-mode" class="hidden">
+          <label class="section-label" for="parent_path">Parent folder path</label>
+          <div class="batch-path-row">
+            <input
+              class="pill-input"
+              type="text"
+              id="parent_path"
+              name="parent_path"
+              placeholder="/Users/nikhil/Downloads/CR"
+            >
+            <button type="button" class="btn-secondary" id="load-folders">Load folders</button>
+          </div>
+          <div class="drop-hint" style="margin-bottom: 12px;">
+            Select CR folders below. BRS and test case files are auto-detected inside each folder.
+          </div>
+
+          <label class="section-label">Folders to process</label>
+          <div class="folder-list" id="folder-list">
+            <div class="folder-empty" id="folder-empty">Enter a parent path and click Load folders.</div>
+          </div>
         </div>
 
         <label class="section-label">Project details</label>
         <div class="field-grid">
-          <input class="pill-input" type="text" id="cr_number" name="cr_number" placeholder="CR number" required>
+          <div id="cr-number-field">
+            <input class="pill-input" type="text" id="cr_number" name="cr_number" placeholder="CR number" required>
+          </div>
           <input class="pill-input" type="text" id="deployment_date" name="deployment_date" placeholder="DD-MM-YYYY" required>
           <input class="pill-input full" type="text" id="files_components" name="files_components" placeholder="Files / components being moved" required>
           <input class="pill-input" type="text" id="spoc_name" name="spoc_name" placeholder="SPOC name" value="Nikhil">
@@ -256,16 +379,88 @@
         <label class="section-label" for="comments">Any thoughts?</label>
         <input class="pill-input" type="text" id="comments" name="comments" placeholder="Add comments here">
 
-        <button type="submit">Review extracted data</button>
+        <button type="submit" id="submit-btn">Review extracted data</button>
       </form>
 
-      <p class="footnote">
+      <p class="footnote" id="footnote">
         Generates Approach, Impact, System Test Cases, UAT Deployment Note, and Release Deployment from your BRS and test case files.
       </p>
     </div>
   </div>
 
   <script>
+    const batchMode = document.getElementById("batch_mode");
+    const singleMode = document.getElementById("single-mode");
+    const batchSection = document.getElementById("batch-mode");
+    const uploadForm = document.getElementById("upload-form");
+    const brsInput = document.getElementById("brs_file");
+    const crNumberField = document.getElementById("cr-number-field");
+    const crNumber = document.getElementById("cr_number");
+    const submitBtn = document.getElementById("submit-btn");
+    const footnote = document.getElementById("footnote");
+    const page = document.getElementById("page");
+    const folderList = document.getElementById("folder-list");
+    const folderEmpty = document.getElementById("folder-empty");
+    const parentPath = document.getElementById("parent_path");
+
+    function setBatchMode(enabled) {
+      singleMode.classList.toggle("hidden", enabled);
+      batchSection.classList.toggle("hidden", !enabled);
+      page.classList.toggle("batch-mode", enabled);
+      brsInput.required = !enabled;
+      crNumber.required = !enabled;
+      crNumberField.style.display = enabled ? "none" : "";
+      if (enabled) {
+        uploadForm.action = "{{ url_for('batch_review') }}";
+        submitBtn.textContent = "Review batch folders";
+        footnote.textContent = "Scans each selected folder for BRS and test case files, then generates zip files inside those folders.";
+      } else {
+        uploadForm.action = "{{ url_for('review') }}";
+        submitBtn.textContent = "Review extracted data";
+        footnote.textContent = "Generates Approach, Impact, System Test Cases, UAT Deployment Note, and Release Deployment from your BRS and test case files.";
+      }
+    }
+
+    batchMode.addEventListener("change", () => setBatchMode(batchMode.checked));
+    setBatchMode(false);
+
+    document.getElementById("load-folders").addEventListener("click", async () => {
+      const pathValue = parentPath.value.trim();
+      if (!pathValue) {
+        folderList.innerHTML = '<div class="folder-error">Enter a parent folder path first.</div>';
+        return;
+      }
+
+      folderList.innerHTML = '<div class="folder-empty">Loading folders...</div>';
+      const formData = new FormData();
+      formData.append("parent_path", pathValue);
+
+      try {
+        const response = await fetch("{{ url_for('batch_folders') }}", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          folderList.innerHTML = `<div class="folder-error">${data.error || "Failed to load folders."}</div>`;
+          return;
+        }
+
+        folderList.innerHTML = "";
+        data.folders.forEach((folder) => {
+          const label = document.createElement("label");
+          label.className = "folder-item";
+          label.innerHTML = `
+            <input type="checkbox" name="batch_folders" value="${folder.name}" checked>
+            <span>${folder.name}</span>
+          `;
+          folderList.appendChild(label);
+        });
+      } catch (error) {
+        folderList.innerHTML = '<div class="folder-error">Could not load folders. Check the path and try again.</div>';
+      }
+    });
+
     function bindDropZone(zoneId, inputId, labelId) {
       const zone = document.getElementById(zoneId);
       const input = document.getElementById(inputId);
